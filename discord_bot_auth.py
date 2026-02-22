@@ -2,6 +2,8 @@ import discord
 from discord.ext import commands
 from discord.ui import Button, View
 import os
+from threading import Thread
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 # 環境変数を読み込む（Renderの環境変数を使用）
 TOKEN = os.getenv('DISCORD_TOKEN')
@@ -100,6 +102,31 @@ async def ping(ctx):
     """botの応答確認（オーナーのみ）"""
     await ctx.send(f'🏓 Pong! {round(bot.latency * 1000)}ms')
 
+
+# =============================================
+# HTTPサーバー（24時間稼働用）
+# =============================================
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/plain')
+        self.end_headers()
+        self.wfile.write(b'Discord Bot is running!')
+    
+    def log_message(self, format, *args):
+        return
+
+
+def run_http_server():
+    port = int(os.environ.get('PORT', 10000))
+    server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
+    print(f'HTTPサーバー起動: ポート {port}')
+    server.serve_forever()
+
+
+# HTTPサーバーをバックグラウンドで起動
+http_thread = Thread(target=run_http_server, daemon=True)
+http_thread.start()
 
 # botを実行
 if __name__ == "__main__":
