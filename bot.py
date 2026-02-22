@@ -16,33 +16,33 @@ class AuthView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="✅ 認証する", style=discord.ButtonStyle.green, custom_id="auth_button")
+    @discord.ui.button(label="✅ 認証する / Verify", style=discord.ButtonStyle.green, custom_id="auth_button")
     async def auth_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         guild = interaction.guild
         role = discord.utils.get(guild.roles, name=ROLE_NAME)
 
         if role is None:
-            await interaction.response.send_message("❌ ロールが見つかりません。サーバー管理者に連絡してください。", ephemeral=True)
+            await interaction.response.send_message("❌ ロールが見つかりません / Role not found. Please contact the server admin.", ephemeral=True)
             return
 
         if role in interaction.user.roles:
-            await interaction.response.send_message("✅ すでに認証済みです！", ephemeral=True)
+            await interaction.response.send_message("✅ すでに認証済みです！ / You are already verified!", ephemeral=True)
             return
 
         await interaction.user.add_roles(role)
-        await interaction.response.send_message("🎉 認証完了！ようこそ！", ephemeral=True)
+        await interaction.response.send_message("🎉 認証完了！ようこそ！ / Verification complete! Welcome!", ephemeral=True)
 
 @tree.command(name="role", description="認証パネルを設置します")
 async def slash_role(interaction: discord.Interaction):
     if interaction.user.id != ALLOWED_USER_ID:
-        await interaction.response.send_message("❌ このコマンドは使用できません。", ephemeral=True)
+        await interaction.response.send_message("❌ このコマンドは使用できません / You do not have permission to use this command.", ephemeral=True)
         return
 
-embed = discord.Embed(
-    title="👋 認証 / Verification",
-    description="下のボタンを押して認証を完了してください。\nPlease press the button below to complete verification.",
-    color=discord.Color.blue()
-)
+    embed = discord.Embed(
+        title="👋 認証 / Verification",
+        description="下のボタンを押して認証を完了してください。\nPlease press the button below to complete verification.",
+        color=discord.Color.blue()
+    )
     await interaction.response.send_message(embed=embed, view=AuthView())
 
 @client.event
