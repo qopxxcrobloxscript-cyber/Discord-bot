@@ -1,6 +1,7 @@
 import discord
 from discord import app_commands
 import os
+import re
 import time
 from collections import defaultdict
 from threading import Thread
@@ -15,22 +16,33 @@ tree = app_commands.CommandTree(client)
 ROLE_NAME = "俺のあなる"
 ALLOWED_USER_ID = int(os.environ.get('ALLOWED_USER_ID'))
 
-# welcomeチャンネルのIDを保存する変数
 welcome_channel_id = None
+anti_channels = set()  # /antiが設定されたチャンネルのID
 
-# 監視対象ユーザーのセット
 suspicious_users = set()
-
-# 最近入ってきたユーザーの記録 (時刻)
 recent_joins = []
-
-# メッセージ送信履歴 {user_id: [timestamp, ...]}
 message_history = defaultdict(list)
 
+# NSFWドメインリスト
+NSFW_DOMAINS = [
+    "pornhub.com", "xvideos.com", "xhamster.com", "redtube.com",
+    "youporn.com", "tube8.com", "spankbang.com", "xnxx.com",
+    "tnaflix.com", "motherless.com", "hentaihaven.xxx", "nhentai.net",
+    "rule34.xxx", "gelbooru.com", "danbooru.donmai.us", "e621.net",
+    "onlyfans.com", "fapello.com", "erome.com", "bunkr.si",
+]
+
 def is_random_id(name: str) -> bool:
-    """名前が乱雑なIDっぽいか判定（数字や記号が多い）"""
     digit_count = sum(c.isdigit() for c in name)
     return len(name) >= 6 and digit_count >= 4
+
+def contains_nsfw_link(content: str) -> bool:
+    urls = re.findall(r'https?://[^\s]+', content)
+    for url in urls:
+        for domain in NSFW_DOMAINS:
+            if domain in url.lower():
+                return True
+    return False
 
 class AuthView(discord.ui.View):
     def __init__(self):
@@ -52,7 +64,6 @@ class AuthView(discord.ui.View):
         await interaction.user.add_roles(role)
         await interaction.response.send_message("🎉 認証完了！ようこそ！ / Verification complete! Welcome!", ephemeral=True)
 
-        # 乱雑なIDかチェックして監視対象に追加
         if is_random_id(interaction.user.name):
             suspicious_users.add(interaction.user.id)
             print(f"👀 監視対象に追加: {interaction.user.name} ({interaction.user.id})")
@@ -80,22 +91,27 @@ async def slash_welcome(interaction: discord.Interaction):
     welcome_channel_id = interaction.channel_id
     await interaction.response.send_message("✅ このチャンネルをwelcomeチャンネルに設定しました！", ephemeral=True)
 
+@tree.command(name="anti", description="このチャンネルのNSFWリンクを自動削除します")
+async def slash_anti(interaction: discord.Interaction):
+    if interaction.user.id != ALLOWED_USER_ID:
+        await interaction.response.send_message("❌ このコマンドは使用できません / You do not have permission to use this command.", ephemeral=True)
+        return
+
+    anti_channels.add(interaction.channel_id)
+    await interaction.response.send_message("✅ このチャンネルのNSFWリンク自動削除を有効にしました！", ephemeral=True)
+
 @client.event
 async def on_member_join(member):
     global recent_joins
 
-    # 乱雑なIDなら監視対象に追加
     if is_random_id(member.name):
         suspicious_users.add(member.id)
         print(f"👀 監視対象に追加(参加時): {member.name} ({member.id})")
 
-    # 最近の参加記録に追加
     now = time.time()
     recent_joins.append((now, member))
-    # 10秒以内の参加のみ残す
     recent_joins = [(t, m) for t, m in recent_joins if now - t <= 10]
 
-    # 3〜5人が一気に入ってきたらタイムアウト
     if 3 <= len(recent_joins) <= 5:
         for join_time, join_member in recent_joins:
             try:
@@ -105,7 +121,6 @@ async def on_member_join(member):
                 print(f"タイムアウト失敗: {e}")
         recent_joins = []
 
-    # welcomeチャンネルに通知
     if welcome_channel_id is None:
         return
     channel = client.get_channel(welcome_channel_id)
@@ -142,17 +157,27 @@ async def on_member_remove(member):
 async def on_message(message):
     if message.author.bot:
         return
+
+    # NSFWリンクチェック
+    if message.channel.id in anti_channels:
+        if contains_nsfw_link(message.content):
+            try:
+                await message.delete()
+                await message.channel.send(f"🚫 {message.author.mention} NSFWリンクを検出したため削除しました。", delete_after=5)
+            except Exception as e:
+                print(f"メッセージ削除失敗: {e}")
+            return
+
+    # 監視対象のスパムチェック
     if message.author.id not in suspicious_users:
         return
 
     user_id = message.author.id
     now = time.time()
 
-    # 5秒以内のメッセージ履歴だけ残す
     message_history[user_id] = [t for t in message_history[user_id] if now - t <= 5]
     message_history[user_id].append(now)
 
-    # 長い文字（20文字以上）が5秒間に8回以上送信されたら12時間タイムアウト
     if len(message_history[user_id]) >= 8 and len(message.content) >= 20:
         try:
             await message.author.timeout(discord.utils.utcnow() + discord.timedelta(hours=12))
