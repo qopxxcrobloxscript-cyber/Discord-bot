@@ -1,7 +1,0 @@
-services:
-  - type: web
-    name: discord-auth-bot
-    env: python
-    pythonVersion: 3.11
-    buildCommand: pip install -r requirements.txt
-    startCommand: python discord_bot_auth.py
