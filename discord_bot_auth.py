@@ -2,13 +2,11 @@ import discord
 from discord.ext import commands
 from discord.ui import Button, View
 import os
-from dotenv import load_dotenv
 
-# 環境変数を読み込む
-load_dotenv()
+# 環境変数を読み込む（Renderの環境変数を使用）
 TOKEN = os.getenv('DISCORD_TOKEN')
-GUILD_ID = int(os.getenv('GUILD_ID', '0'))
 ROLE_ID = int(os.getenv('ROLE_ID', '0'))
+OWNER_ID = int(os.getenv('OWNER_ID', '0'))  # あなたのユーザーID
 
 # Intentsの設定
 intents = discord.Intents.default()
@@ -59,6 +57,22 @@ class AuthenticationView(View):
 
 
 @bot.event
+async def on_command_error(ctx, error):
+    """コマンドエラーの処理"""
+    if isinstance(error, commands.CheckFailure):
+        await ctx.send("❌ このコマンドを実行する権限がありません。", ephemeral=True)
+    else:
+        print(f"エラー: {error}")
+
+
+# オーナーのみコマンド実行可能にするチェック
+def is_owner():
+    def predicate(ctx):
+        return ctx.author.id == 1464850594790637569
+    return commands.check(predicate)
+
+
+@bot.event
 async def on_ready():
     """botが起動したときの処理"""
     print(f'{bot.user} がログインしました')
@@ -66,9 +80,9 @@ async def on_ready():
 
 
 @bot.command(name='auth_setup')
-@commands.has_permissions(administrator=True)
+@is_owner()
 async def auth_setup(ctx):
-    """認証ボタンを表示するコマンド（管理者のみ）"""
+    """認証ボタンを表示するコマンド（オーナーのみ）"""
     embed = discord.Embed(
         title="🔐 認証",
         description="下のボタンをクリックして認証を完了してください。",
@@ -81,8 +95,9 @@ async def auth_setup(ctx):
 
 
 @bot.command(name='ping')
+@is_owner()
 async def ping(ctx):
-    """botの応答確認"""
+    """botの応答確認（オーナーのみ）"""
     await ctx.send(f'🏓 Pong! {round(bot.latency * 1000)}ms')
 
 
