@@ -4,6 +4,7 @@ import os
 import re
 import time
 from collections import defaultdict
+from datetime import timezone
 from threading import Thread
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -17,13 +18,12 @@ ROLE_NAME = "俺のあなる"
 ALLOWED_USER_ID = int(os.environ.get('ALLOWED_USER_ID'))
 
 welcome_channel_id = None
-anti_channels = set()  # /antiが設定されたチャンネルのID
+anti_channels = set()
 
 suspicious_users = set()
 recent_joins = []
 message_history = defaultdict(list)
 
-# NSFWドメインリスト
 NSFW_DOMAINS = [
     "pornhub.com", "xvideos.com", "xhamster.com", "redtube.com",
     "youporn.com", "tube8.com", "spankbang.com", "xnxx.com",
@@ -35,6 +35,11 @@ NSFW_DOMAINS = [
 def is_random_id(name: str) -> bool:
     digit_count = sum(c.isdigit() for c in name)
     return len(name) >= 6 and digit_count >= 4
+
+def is_new_account(user: discord.User) -> bool:
+    now = discord.utils.utcnow()
+    account_age = now - user.created_at
+    return account_age.days < 1
 
 def contains_nsfw_link(content: str) -> bool:
     urls = re.findall(r'https?://[^\s]+', content)
@@ -64,9 +69,15 @@ class AuthView(discord.ui.View):
         await interaction.user.add_roles(role)
         await interaction.response.send_message("🎉 認証完了！ようこそ！ / Verification complete! Welcome!", ephemeral=True)
 
-        if is_random_id(interaction.user.name):
+        # 乱雑なIDまたは今日作られたアカウントなら監視対象に追加
+        if is_random_id(interaction.user.name) or is_new_account(interaction.user):
             suspicious_users.add(interaction.user.id)
-            print(f"👀 監視対象に追加: {interaction.user.name} ({interaction.user.id})")
+            reason = []
+            if is_random_id(interaction.user.name):
+                reason.append("乱雑なID")
+            if is_new_account(interaction.user):
+                reason.append("新規アカウント")
+            print(f"👀 監視対象に追加: {interaction.user.name} ({interaction.user.id}) 理由: {', '.join(reason)}")
 
 @tree.command(name="role", description="認証パネルを設置します")
 async def slash_role(interaction: discord.Interaction):
@@ -104,9 +115,14 @@ async def slash_anti(interaction: discord.Interaction):
 async def on_member_join(member):
     global recent_joins
 
-    if is_random_id(member.name):
+    if is_random_id(member.name) or is_new_account(member):
         suspicious_users.add(member.id)
-        print(f"👀 監視対象に追加(参加時): {member.name} ({member.id})")
+        reason = []
+        if is_random_id(member.name):
+            reason.append("乱雑なID")
+        if is_new_account(member):
+            reason.append("新規アカウント")
+        print(f"👀 監視対象に追加(参加時): {member.name} ({member.id}) 理由: {', '.join(reason)}")
 
     now = time.time()
     recent_joins.append((now, member))
@@ -158,7 +174,6 @@ async def on_message(message):
     if message.author.bot:
         return
 
-    # NSFWリンクチェック
     if message.channel.id in anti_channels:
         if contains_nsfw_link(message.content):
             try:
@@ -168,7 +183,6 @@ async def on_message(message):
                 print(f"メッセージ削除失敗: {e}")
             return
 
-    # 監視対象のスパムチェック
     if message.author.id not in suspicious_users:
         return
 
