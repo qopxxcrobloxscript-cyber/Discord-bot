@@ -38,11 +38,11 @@ async def slash_role(interaction: discord.Interaction):
         await interaction.response.send_message("❌ このコマンドは使用できません。", ephemeral=True)
         return
 
-    embed = discord.Embed(
-        title="👋 認証",
-        description="下のボタンを押して認証を完了してください。",
-        color=discord.Color.blue()
-    )
+embed = discord.Embed(
+    title="👋 認証 / Verification",
+    description="下のボタンを押して認証を完了してください。\nPlease press the button below to complete verification.",
+    color=discord.Color.blue()
+)
     await interaction.response.send_message(embed=embed, view=AuthView())
 
 @client.event
