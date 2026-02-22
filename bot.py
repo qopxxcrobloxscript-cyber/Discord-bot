@@ -12,6 +12,9 @@ tree = app_commands.CommandTree(client)
 ROLE_NAME = "俺のあなる"
 ALLOWED_USER_ID = int(os.environ.get('ALLOWED_USER_ID'))
 
+# welcomeチャンネルのIDを保存する変数
+welcome_channel_id = None
+
 class AuthView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -44,6 +47,36 @@ async def slash_role(interaction: discord.Interaction):
         color=discord.Color.blue()
     )
     await interaction.response.send_message(embed=embed, view=AuthView())
+
+@tree.command(name="welcome", description="このチャンネルに入退出メッセージを送るように設定します")
+async def slash_welcome(interaction: discord.Interaction):
+    if interaction.user.id != ALLOWED_USER_ID:
+        await interaction.response.send_message("❌ このコマンドは使用できません / You do not have permission to use this command.", ephemeral=True)
+        return
+
+    global welcome_channel_id
+    welcome_channel_id = interaction.channel_id
+    await interaction.response.send_message(f"✅ このチャンネルをwelcomeチャンネルに設定しました！", ephemeral=True)
+
+@client.event
+async def on_member_join(member):
+    if welcome_channel_id is None:
+        return
+    channel = client.get_channel(welcome_channel_id)
+    if channel is None:
+        return
+    member_count = member.guild.member_count
+    await channel.send(f"🎉 {member.mention} が参加しました！現在のサーバー人数: {member_count}人")
+
+@client.event
+async def on_member_remove(member):
+    if welcome_channel_id is None:
+        return
+    channel = client.get_channel(welcome_channel_id)
+    if channel is None:
+        return
+    member_count = member.guild.member_count
+    await channel.send(f"👋 {member.mention} が退出しました。現在のサーバー人数: {member_count}人")
 
 @client.event
 async def on_ready():
