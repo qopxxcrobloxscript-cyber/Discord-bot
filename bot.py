@@ -56,7 +56,7 @@ async def slash_welcome(interaction: discord.Interaction):
 
     global welcome_channel_id
     welcome_channel_id = interaction.channel_id
-    await interaction.response.send_message(f"✅ このチャンネルをwelcomeチャンネルに設定しました！", ephemeral=True)
+    await interaction.response.send_message("✅ このチャンネルをwelcomeチャンネルに設定しました！", ephemeral=True)
 
 @client.event
 async def on_member_join(member):
@@ -66,7 +66,14 @@ async def on_member_join(member):
     if channel is None:
         return
     member_count = member.guild.member_count
-    await channel.send(f"🎉 {member.mention} が参加しました！現在のサーバー人数: {member_count}人")
+    embed = discord.Embed(
+        title="🎉 メンバー参加 / Member Joined",
+        description=f"{member.mention} が参加しました！\n{member.mention} has joined the server!",
+        color=discord.Color.green()
+    )
+    embed.add_field(name="👥 現在のサーバー人数 / Member Count", value=f"{member_count}人")
+    embed.set_thumbnail(url=member.display_avatar.url)
+    await channel.send(embed=embed)
 
 @client.event
 async def on_member_remove(member):
@@ -76,7 +83,14 @@ async def on_member_remove(member):
     if channel is None:
         return
     member_count = member.guild.member_count
-    await channel.send(f"👋 {member.mention} が退出しました。現在のサーバー人数: {member_count}人")
+    embed = discord.Embed(
+        title="👋 メンバー退出 / Member Left",
+        description=f"{member.name} が退出しました。\n{member.name} has left the server.",
+        color=discord.Color.red()
+    )
+    embed.add_field(name="👥 現在のサーバー人数 / Member Count", value=f"{member_count}人")
+    embed.set_thumbnail(url=member.display_avatar.url)
+    await channel.send(embed=embed)
 
 @client.event
 async def on_ready():
