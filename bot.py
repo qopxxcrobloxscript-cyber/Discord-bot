@@ -9,7 +9,7 @@ intents.members = True
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
-ROLE_NAME = "認証済み"
+ROLE_NAME = "俺のあなる"
 ALLOWED_USER_ID = int(os.environ.get('ALLOWED_USER_ID'))
 
 class AuthView(discord.ui.View):
