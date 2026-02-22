@@ -68,7 +68,7 @@ async def on_command_error(ctx, error):
 # オーナーのみコマンド実行可能にするチェック
 def is_owner():
     def predicate(ctx):
-        return ctx.author.id == 1464850594790637569
+        return ctx.author.id == OWNER_ID
     return commands.check(predicate)
 
 
